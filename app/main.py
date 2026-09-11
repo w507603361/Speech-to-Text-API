@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.database import create_database_engine
+from app.errors import APIError
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -15,7 +16,7 @@ logger = logging.getLogger("uvicorn.error")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.db = create_database_engine()
-    logger.info("Application started (step 1: database foundation)")
+    logger.info("Application started (step 2: recording persistence)")
     try:
         yield
     finally:
@@ -23,7 +24,15 @@ async def lifespan(app: FastAPI):
         logger.info("Database connections closed")
 
 
-app = FastAPI(title="Speech-to-Text API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Speech-to-Text API", version="0.2.0", lifespan=lifespan)
+
+
+@app.exception_handler(APIError)
+async def handle_api_error(request, exc: APIError):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": {"code": exc.code, "message": exc.message}},
+    )
 
 
 @app.get("/health")

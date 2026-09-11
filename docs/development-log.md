@@ -1,5 +1,26 @@
 # 开发记录
 
+## 第 2 步：文件与录音持久化
+
+- 日期：2026-09-11；沿用 main 分支。
+- 新增 storage.py、recordings.py 和 errors.py；增加必要中文注释，说明路径隔离、分块读写、事务和单文件补偿清理。
+- 应用版本 0.2.0；增加 uploads 持久卷；SQL 无变更，不清空已有数据库。
+- 日志记录 upload_started、upload_saved、task_created、upload_failed 和 upload_cleaned，关联 recording_id、task_id、attempt；失败日志包含错误类别，不输出凭据或文件内容。
+- 按阶段计划不开放上传路由、不调度后台任务；本轮以一次性容器内调用验收，没有提交自动化测试套件，DeepSeek 调用 0 次。
+
+| 人工验收 | 结果 |
+| --- | --- |
+| 缺少文件、空内容、非法扩展名 | APIError 400，未留下文件或数据库记录 |
+| 50MB + 1 字节 | APIError 413，部分文件已清理 |
+| 恰好 50MB、WAV 大写扩展名、原始路径 ../../acceptance.WAV | 成功；展示名 acceptance.WAV，磁盘名为 UUID.wav |
+| 成功事务 | recordings 与 tasks 各增加一条，status=pending、attempt=1，磁盘字节数正确 |
+| 在第二条 INSERT 前由 MySQL SIGNAL 注入错误 | APIError 500；第一条 INSERT 回滚，文件清理，两表计数不变 |
+| 验收清理 | 仅删除样例文件 13d919aa-432a-433e-bde4-d1c86350f7eb.wav，以及录音 998f7f93-ed61-4b95-856d-9330b300092a 的关联数据 |
+
+这是服务层验收，未将异常断言冒充已开放 HTTP 上传接口的验收。极端进程退出和提交结果不确定时的跨文件系统/数据库一致性限制见 README。
+
+提交主题：`feat: persist uploaded recordings and pending tasks`；代码提交及远程核对结果在推送后补记。
+
 ## 第 1 步：FastAPI 与 MySQL 基础
 
 - 日期：2026-09-11。

@@ -19,6 +19,8 @@ services:
     restart: unless-stopped
   api:
     build: .
+    volumes:
+      - uploads:/app/uploads
     ports:
       - "127.0.0.1:${APP_PORT:-8000}:8000"
     environment:
@@ -37,3 +39,4 @@ services:
     restart: unless-stopped
 volumes:
   mysql_data:
+  uploads:

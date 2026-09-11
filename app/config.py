@@ -1,6 +1,9 @@
 import os
+from pathlib import Path
 
 from sqlalchemy import URL
+
+UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "/app/uploads"))
 
 
 def database_url() -> URL:
