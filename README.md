@@ -2,7 +2,7 @@
 
 Python 3.12 + FastAPI + MySQL，按阶段开发的录音转写与摘要服务。
 
-当前完成第 3 步：上传、异步 Mock 转写、任务查询、录音列表和详情。转写成功暂留 summarizing，尚未调用 DeepSeek；第 4 步才形成完整摘要闭环。完整范围见[项目实现方案](项目实现方案.md)。只选择 Azure 公网部署加分项，不实现其他加分项。
+当前完成第 4 步：上传 → 异步 Mock 转写 → 真实 DeepSeek 结构化摘要 → done，并支持查询结果与失败原因。完整范围见[项目实现方案](项目实现方案.md)。只选择 Azure 公网部署加分项，不实现其他加分项。
 
 ## 启动
 
@@ -27,9 +27,11 @@ Python 3.12 + FastAPI + MySQL，按阶段开发的录音转写与摘要服务。
 | MYSQL_PASSWORD | 应用数据库密码，必填 |
 | MYSQL_ROOT_PASSWORD | 数据库初始化管理员密码，必填，仅传入 db 容器 |
 | APP_PORT | 本机 HTTP 端口，默认 8000 |
-| DEEPSEEK_API_KEY / DEEPSEEK_MODEL | 后续第 4 步使用；当前不传入容器、不调用 API |
+| DEEPSEEK_API_KEY / DEEPSEEK_MODEL | 仅传入应用容器；模型默认 deepseek-flash，Key 缺失时任务报 LLM_NOT_CONFIGURED |
+| DEEPSEEK_BASE_URL | 默认 https://api.deepseek.com，可包含 /v1 前缀 |
+| DEEPSEEK_TIMEOUT_SECONDS | 请求总等待预算，默认 60 秒；连接等待最多 10 秒 |
 
-用户指定模型为 `DeepSeek-V4.1-Flash`，实际 API 模型标识在第 4 步核对。`.env` 不提交 Git，也不进入镜像构建上下文。
+用户指定模型为 `DeepSeek-V4.1-Flash`，使用已核对的官方 API 标识 `deepseek-flash`，依据 [DeepSeek 2026-09-10 发布说明](https://www.deepseek.com/en/news/deepseek-v4-1-flash/)。`.env` 不提交 Git，也不进入镜像构建上下文；只在容器运行时注入指定变量。
 
 ## 架构与表结构
 
@@ -52,7 +54,7 @@ flowchart LR
 
 第 1 步人工验收：Compose 两个服务健康；`/health` 200；`/docs` 可访问；两张表及外键存在；暂停数据库时 `/health` 503，恢复后回到 200。验收与提交记录见 [开发记录](docs/development-log.md)。
 
-Azure 部署、完整 API 调试文件和业务功能按后续阶段补充。本阶段没有消耗 DeepSeek 额度。
+Azure 部署、完整 API 调试文件及重试/删除功能按后续阶段补充。真实摘要调用会消耗 DeepSeek 额度，不进行自动重试。
 
 ## 第 2 步：文件与持久化服务
 
@@ -76,8 +78,27 @@ Azure 部署、完整 API 调试文件和业务功能按后续阶段补充。本
 | GET /v1/recordings?page=1&page_size=20 | 按创建时间及 ID 倒序，返回 items、total、分页信息 |
 | GET /v1/recordings/{id} | 元数据、状态、已有 transcript 和 summary_result，不暴露存储路径 |
 
-在 `/docs` 中可直接上传文件。文件保存并建库后即返回，不等待 Mock 的 5～15 秒延迟。Mock 约 20% 概率失败，成功文本为固定会议内容，与真实录音无关。当前没有摘要执行器，因此成功转写后保持 summarizing，summary_result 为 null，这不是最终完成状态。
+在 `/docs` 中可直接上传文件。文件保存并建库后即返回，不等待 Mock 的 5～15 秒延迟。Mock 约 20% 概率失败，成功文本为固定会议内容，与真实录音无关。第 4 步已接通摘要执行器：summarizing 期间结果为 null，成功后保存结构化结果并进入 done。
 
 后台协程引用保存在应用生命周期中，任务结束后释放；pending 条件更新防止重复执行。关闭应用取消后台协程，下一次启动将 pending/transcribing/summarizing 标记 failed、错误码 SERVICE_RESTARTED，不自动继续执行。数据库不可用导致失败状态无法落库时记录日志，待数据库恢复后重启应用处理遗留状态。
 
 UUID 格式错误或分页不合法返回统一 400；资源不存在返回 404。时间以 UTC ISO 8601 返回。重试和删除接口尚未实现，不包含并发限制等其他加分项。
+
+## 第 4 步：真实 DeepSeek 摘要
+
+`app/deepseek.py` 使用生命周期内共享 HTTPX 客户端；关闭应用时先取消业务任务，再关闭 HTTP 客户端。请求使用 JSON Output、关闭思考模式、最多 512 输出 token；未设置自动重试。参数依据 [JSON Output](https://api-docs.deepseek.com/guides/json_mode/) 和 [Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode/) 官方说明。
+
+Pydantic 严格要求 summary 为非空字符串，key_points 和 todos 为非空字符串的数组（数组可以为空），不接受多余字段。空内容、非法 JSON、字段缺失、字段类型错误、截断输出等均失败，不用占位摘要冒充成功。
+
+| 错误码 | 含义 |
+| --- | --- |
+| LLM_TIMEOUT | 请求超时，包括总等待时间耗尽 |
+| LLM_CONNECTION_ERROR | 网络连接错误 |
+| LLM_AUTH_ERROR / LLM_INSUFFICIENT_BALANCE | 认证失败 / 余额不足 |
+| LLM_RATE_LIMITED / LLM_UPSTREAM_ERROR | 限流 / 其他上游错误 |
+| LLM_INVALID_OUTPUT | 输出不符合摘要结构或被截断 |
+| LLM_NOT_CONFIGURED | 缺少 API Key |
+
+上述错误将任务置为 failed，保留 transcript；GET 查询仍返回 200 和任务错误，先前的上传 202 不受影响。摘要结果和 done、finished_at 在同一事务提交。日志记录模型、task_id、阶段、成功调用耗时及失败码，不记录密钥、原始上游错误或全文。
+
+服务重启规则保持不变，不自动续跑或重试。若上游已完成但数据库提交失败，可能已计费；日志与数据库状态需人工核查，后续手动重试可能再产生费用。

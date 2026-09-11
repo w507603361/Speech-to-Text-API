@@ -1,5 +1,31 @@
 # 开发记录
 
+## 第 4 步：真实 DeepSeek 摘要
+
+- 日期：2026-09-11；版本 0.4.0；新增 deepseek.py 与 HTTPX 依赖。
+- 根据 DeepSeek 2026-09-10 官方发布说明，V4.1-Flash 的 API ID 为 deepseek-flash；Compose 使用该默认值，无需修改现有密钥。
+- 生命周期内共享 HTTP 客户端，使用 JSON Output、关闭思考、512 输出 token 上限、60 秒总超时，不自动重试。
+- Pydantic 严格校验摘要结构；任务失败保存业务错误码并保留 transcript；结果与 done/finished_at 同事务保存。
+- 注释明确 JSON 结构校验、总超时、密钥保护和事务边界；日志关联 task_id/recording_id/attempt，记录模型、阶段、耗时与错误码。
+
+| 验收 | 结果 |
+| --- | --- |
+| 本地 HTTP 替身：合法 JSON、空待办数组 | 通过 |
+| 本地替身：空内容、非法 JSON、缺字段、错误类型、截断 | LLM_INVALID_OUTPUT |
+| 本地替身：401 / 402 / 429 / 503 | 对应认证、余额不足、限流、上游错误码 |
+| 本地替身：读取超时 | LLM_TIMEOUT |
+| 本地替身：总等待超时 + 完整任务执行 | failed / LLM_TIMEOUT，transcript 保留、结果仍为空 |
+| HTTP 上传 + 默认随机 Mock + 真实 DeepSeek | 202 → transcribing → summarizing → done，详情含三字段摘要 |
+| 真实摘要请求数 | 1 次，无自动重试；约 1.02 秒完成，不估算未经计量的费用 |
+
+真实成功样例：recording_id=884f12d1-5483-4b9f-b49c-08bf6bcacffa，task_id=cd1f177a-c403-4b44-86e8-5022118efa31，文件 stage4.wav 为 7 字节演示数据。固定 Mock 文本没有敏感内容。保留该 done 样例供查看，不删除文件。
+
+旧 stage3 样例用于零费用错误验收，最终状态为 failed / LLM_TIMEOUT。本轮替身只运行在独立验收进程，没有替换正在运行的真实客户端，也未添加自动化测试套件。
+
+密钥仅从 .env 注入应用容器，不进入镜像或 Git。第 5 步的重试与删除、第 7 步 Azure 部署尚未实现。
+
+代码提交主题：`feat: generate validated summaries with DeepSeek`，推送后补记提交标识。
+
 ## 第 3 步：异步 Mock 转写与查询
 
 - 日期：2026-09-11；版本 0.3.0；新增 routes.py 与 tasks.py。

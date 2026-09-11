@@ -25,6 +25,10 @@ services:
       - "127.0.0.1:${APP_PORT:-8000}:8000"
     environment:
       MYSQL_HOST: db
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_TIMEOUT_SECONDS: ${DEEPSEEK_TIMEOUT_SECONDS:-60}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-speech_api}
       MYSQL_USER: ${MYSQL_USER:-speech_api}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Configure MYSQL_PASSWORD in .env}

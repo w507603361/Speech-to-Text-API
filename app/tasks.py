@@ -1,8 +1,10 @@
 import asyncio
 import logging
 import random
+import json
 
 from sqlalchemy import text
+from app.deepseek import SummaryError
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -23,8 +25,8 @@ async def mark_interrupted(engine):
         logger.info("task_interrupted task_id=%s recording_id=%s attempt=%s", row['id'], row['recording_id'], row['attempt'])
 
 
-async def transcribe(engine, task_id):
-    """Mock 模拟耗时与失败率；摘要接入前保留 summarizing 中间态。"""
+async def transcribe(engine, task_id, deepseek):
+    """Mock 转写完成后调用真实摘要；阶段结果分别在短事务落库。"""
     try:
         async with engine.begin() as conn:
             claimed = await conn.execute(text(
@@ -48,28 +50,38 @@ async def transcribe(engine, task_id):
                 ), {'id': task_id})
             logger.info("task_failed %s code=ASR_FAILED", context)
             return
+        transcript = '今天讨论了录音服务的开发计划。先完成上传和转写，再接入智能摘要。小王负责接口联调，小李在周五前整理部署文档。'
         async with engine.begin() as conn:
             await conn.execute(text(
                 "UPDATE recordings SET transcript=:transcript WHERE id=:id"
-            ), {'id': row['recording_id'], 'transcript': '今天讨论了录音服务的开发计划。先完成上传和转写，再接入智能摘要。小王负责接口联调，小李在周五前整理部署文档。'})
+            ), {'id': row['recording_id'], 'transcript': transcript})
             await conn.execute(text("UPDATE tasks SET status='summarizing' WHERE id=:id"), {'id': task_id})
-        logger.info("task_summarizing %s summary_not_implemented=true", context)
+        logger.info("task_summarizing %s", context)
+        result = await deepseek.summarize(transcript, context)
+        # 结果和 done 状态同时提交，查询不会看到 done 但缺少结果。
+        async with engine.begin() as conn:
+            await conn.execute(text('UPDATE recordings SET summary_result=:result WHERE id=:id'),
+                               {'result': json.dumps(result, ensure_ascii=False), 'id': row['recording_id']})
+            await conn.execute(text("UPDATE tasks SET status='done', finished_at=UTC_TIMESTAMP(6) WHERE id=:id"), {'id': task_id})
+        logger.info("task_done %s", context)
     except asyncio.CancelledError:
         logger.info("task_cancelled task_id=%s; next startup marks failed", task_id)
         raise
     except Exception as exc:
-        logger.error("task_error task_id=%s error=%s", task_id, type(exc).__name__)
+        code = exc.code if isinstance(exc, SummaryError) else 'PROCESSING_FAILED'
+        message = exc.message if isinstance(exc, SummaryError) else '任务处理异常'
+        logger.error("task_error task_id=%s code=%s error=%s", task_id, code, type(exc).__name__)
         try:
             async with engine.begin() as conn:
                 await conn.execute(text(
-                    "UPDATE tasks SET status='failed', error_code='PROCESSING_FAILED', "
-                    "error_message='任务处理异常', finished_at=UTC_TIMESTAMP(6) WHERE id=:id"
-                ), {'id': task_id})
+                    "UPDATE tasks SET status='failed', error_code=:code, "
+                    "error_message=:message, finished_at=UTC_TIMESTAMP(6) WHERE id=:id"
+                ), {'id': task_id, 'code': code, 'message': message})
         except Exception as persistence_error:
             logger.error("task_failure_not_saved task_id=%s error=%s", task_id, type(persistence_error).__name__)
 
 
 def schedule(app, task_id):
-    task = asyncio.create_task(transcribe(app.state.db, task_id))
+    task = asyncio.create_task(transcribe(app.state.db, task_id, app.state.deepseek))
     app.state.tasks.add(task)
     task.add_done_callback(app.state.tasks.discard)

@@ -13,6 +13,7 @@ from app.database import create_database_engine
 from app.errors import APIError
 from app.routes import router
 from app.tasks import mark_interrupted
+from app.deepseek import DeepSeek
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -21,20 +22,22 @@ logger = logging.getLogger("uvicorn.error")
 async def lifespan(app: FastAPI):
     app.state.db = create_database_engine()
     app.state.tasks = set()
+    app.state.deepseek = DeepSeek()
     try:
         await mark_interrupted(app.state.db)
-        logger.info("Application started (step 3: mock transcription)")
+        logger.info("Application started (step 4: DeepSeek summaries)")
         yield
     finally:
         tasks = list(app.state.tasks)
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        await app.state.deepseek.close()
         await app.state.db.dispose()
         logger.info("Database connections closed")
 
 
-app = FastAPI(title="Speech-to-Text API", version="0.3.0", lifespan=lifespan)
+app = FastAPI(title="Speech-to-Text API", version="0.4.0", lifespan=lifespan)
 app.include_router(router)
 
 
