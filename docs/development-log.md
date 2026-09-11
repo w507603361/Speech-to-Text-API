@@ -19,7 +19,12 @@
 
 这是服务层验收，未将异常断言冒充已开放 HTTP 上传接口的验收。极端进程退出和提交结果不确定时的跨文件系统/数据库一致性限制见 README。
 
-提交主题：`feat: persist uploaded recordings and pending tasks`；代码提交及远程核对结果在推送后补记。
+提交主题：`feat: persist uploaded recordings and pending tasks`。
+
+- 代码提交：`f9612ef0160aabea83f38d287d089948c9895c78`。
+- 链接：https://github.com/w507603361/Speech-to-Text-API/commit/f9612ef0160aabea83f38d287d089948c9895c78 。
+- 已推送 origin/main，并通过 ls-remote 核对该代码提交；本条推送记录随后以独立文档提交追加。
+- 最终重建后 /health 返回 status=ok、database=ok；本地服务继续使用 18000 端口。
 
 ## 第 1 步：FastAPI 与 MySQL 基础
 
