@@ -23,7 +23,11 @@
 
 成功停在 summarizing 是第 3 步的明确中间态；第 4 步实现摘要，第 5 步实现手动重试和删除。未实现任何额外加分项。
 
-代码提交主题：`feat: add async transcription and query APIs`，推送后补记提交标识。
+代码提交主题：`feat: add async transcription and query APIs`。
+
+- 代码提交：`de8ea53efd553d987485a1997e6ec7190468bd83`。
+- 链接：https://github.com/w507603361/Speech-to-Text-API/commit/de8ea53efd553d987485a1997e6ec7190468bd83 。
+- 已推送 origin/main 并通过 ls-remote 核对；本条记录以独立文档提交追加。
 
 ## 第 2 步：文件与录音持久化
 
