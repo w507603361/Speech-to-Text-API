@@ -16,7 +16,7 @@ logger = logging.getLogger("uvicorn.error")
 async def create_recording(
     upload: UploadFile | None, engine: AsyncEngine, upload_dir: Path
 ) -> dict[str, str]:
-    """保存文件，再原子创建录音与任务；由下一阶段的接口负责调用。"""
+    """保存文件，再原子创建录音与任务；路由随后注册后台处理。"""
     recording_id, task_id = str(uuid4()), str(uuid4())
     context = f"recording_id={recording_id} task_id={task_id} attempt=1"
     if upload is None or not upload.filename:

@@ -1,5 +1,30 @@
 # 开发记录
 
+## 第 3 步：异步 Mock 转写与查询
+
+- 日期：2026-09-11；版本 0.3.0；新增 routes.py 与 tasks.py。
+- 开放 POST /v1/recordings、GET /v1/tasks/{task_id}、GET /v1/recordings、GET /v1/recordings/{id}。
+- 增加 multipart 解析依赖、统一参数/HTTP/数据库错误处理、UTC 时间序列化。
+- 上传事务完成后注册 asyncio 任务，保留引用、结束释放；启动前将遗留任务标记失败，关闭时取消后台协程。
+- 注释说明了状态领取、生命周期、事务快照和 Mock 中间态；日志记录转写耗时、任务阶段、失败原因与重启中断。
+
+| 人工验收 | 实际结果 |
+| --- | --- |
+| HTTP multipart 上传 | 202、pending；约 0.031 秒返回，未等待转写 |
+| 真实随机 Mock 成功 | 约 6 秒后 summarizing；固定 transcript 已持久化，summary_result=null |
+| 任务、详情、分页列表 | 均 200，状态一致，详情不暴露 storage_path，时间含 UTC 时区 |
+| page=0、非法 UUID | 统一 400 INVALID_REQUEST |
+| 不存在的任务 UUID | 404 TASK_NOT_FOUND |
+| 实际重启 API | summarizing 变为 failed / SERVICE_RESTARTED，未自动续跑 |
+| 一次性验收进程固定随机值 | failed / ASR_FAILED；再次调用同一任务不会执行，条件领取生效 |
+| 重启后健康检查 | 200，database=ok |
+
+本轮保留一条 7 字节非敏感样例 stage3.wav，录音 ID 为 c35ca08d-88f7-4f5a-b50b-b01d42fa9cd5，任务 ID 为 800e43e3-2b48-4e7b-9823-efb1ad3816eb；最终为定向验收的 ASR_FAILED。没有删除文件、没有添加自动化测试套件，DeepSeek 请求为 0 次。
+
+成功停在 summarizing 是第 3 步的明确中间态；第 4 步实现摘要，第 5 步实现手动重试和删除。未实现任何额外加分项。
+
+代码提交主题：`feat: add async transcription and query APIs`，推送后补记提交标识。
+
 ## 第 2 步：文件与录音持久化
 
 - 日期：2026-09-11；沿用 main 分支。
