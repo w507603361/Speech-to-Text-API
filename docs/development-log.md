@@ -24,7 +24,12 @@
 
 密钥仅从 .env 注入应用容器，不进入镜像或 Git。第 5 步的重试与删除、第 7 步 Azure 部署尚未实现。
 
-代码提交主题：`feat: generate validated summaries with DeepSeek`，推送后补记提交标识。
+代码提交主题：`feat: generate validated summaries with DeepSeek`。
+
+- 代码提交：`a1a9425cf4fcfbfac5f1c322afdaac7195cf088f`。
+- 链接：https://github.com/w507603361/Speech-to-Text-API/commit/a1a9425cf4fcfbfac5f1c322afdaac7195cf088f 。
+- 已推送 origin/main 并以 ls-remote 核对；本条记录作为独立文档提交追加。
+- pip check 通过；暂存内容与 .env 敏感变量比对通过，未包含真实密钥。
 
 ## 第 3 步：异步 Mock 转写与查询
 
