@@ -1,0 +1,5 @@
+fastapi==0.141.1
+uvicorn==0.52.4
+SQLAlchemy[asyncio]==2.0.52
+asyncmy==0.2.14
+cryptography==50.0.1
