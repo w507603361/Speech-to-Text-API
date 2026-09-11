@@ -29,4 +29,11 @@
 
 本次只进行上述人工验收，没有创建自动化测试套件。首次启动的镜像下载问题和端口冲突均已解决。
 
-提交主题：`chore: initialize FastAPI and MySQL foundation`。提交哈希及远程核对结果在提交后补记。
+### GitHub 提交记录
+
+- 代码提交：`fd092d868bdeff2024beaba4538519b3d3fa8cf6`。
+- 提交主题：`chore: initialize FastAPI and MySQL foundation`。
+- 提交链接：https://github.com/w507603361/Speech-to-Text-API/commit/fd092d868bdeff2024beaba4538519b3d3fa8cf6 。
+- 已推送至 `origin/main`，并通过 `git ls-remote` 确认远程 main 对应上述代码提交。
+- 本条记录通过独立文档提交追加，保留代码提交原始历史；最终 main 因此包含代码提交和记录提交。
+- 提交前核对 `.env` 已忽略，并将其敏感变量值与暂存 diff 比对，未发现泄漏。
