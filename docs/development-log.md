@@ -27,7 +27,12 @@
 
 尚未完成第 7 步 Azure 公网部署，需要届时提供 Azure 订阅、资源/VM、地区预算及 SSH 信息；本轮未创建或操作 Azure 资源。
 
-代码/交付提交主题：`docs: add local setup and API acceptance guide`，提交后补记远程核对结果。
+交付提交主题：`docs: add local setup and API acceptance guide`。
+
+- 交付提交：`062b7136b5f3b31050d3d82998605ac24262573e`。
+- 链接：https://github.com/w507603361/Speech-to-Text-API/commit/062b7136b5f3b31050d3d82998605ac24262573e 。
+- 已推送 origin/main 并以 ls-remote 核对，本条记录通过独立文档提交追加。
+- .env 和 .env.step6 已确认被 Git 忽略，未提交任何实际配置密钥。
 
 ## 第 5 步：失败重试、删除与并发保护
 
