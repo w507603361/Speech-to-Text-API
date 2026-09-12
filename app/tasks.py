@@ -38,24 +38,17 @@ async def transcribe(engine, task_id, deepseek):
             row = (await conn.execute(text(
                 "SELECT recording_id, attempt FROM tasks WHERE id=:id"
             ), {'id': task_id})).mappings().one()
+            transcript = (await conn.execute(text('SELECT transcript FROM recordings WHERE id=:id'),
+                                             {'id': row['recording_id']})).scalar_one()
+            if transcript is not None:
+                await conn.execute(text("UPDATE tasks SET status='summarizing' WHERE id=:id"), {'id': task_id})
         context = f"task_id={task_id} recording_id={row['recording_id']} attempt={row['attempt']}"
-        delay = random.uniform(5, 15)
-        logger.info("task_transcribing %s delay_seconds=%.2f", context, delay)
-        await asyncio.sleep(delay)
-        if random.random() < 0.2:
-            async with engine.begin() as conn:
-                await conn.execute(text(
-                    "UPDATE tasks SET status='failed', error_code='ASR_FAILED', "
-                    "error_message='模拟转写失败', finished_at=UTC_TIMESTAMP(6) WHERE id=:id"
-                ), {'id': task_id})
-            logger.info("task_failed %s code=ASR_FAILED", context)
-            return
-        transcript = '今天讨论了录音服务的开发计划。先完成上传和转写，再接入智能摘要。小王负责接口联调，小李在周五前整理部署文档。'
-        async with engine.begin() as conn:
-            await conn.execute(text(
-                "UPDATE recordings SET transcript=:transcript WHERE id=:id"
-            ), {'id': row['recording_id'], 'transcript': transcript})
-            await conn.execute(text("UPDATE tasks SET status='summarizing' WHERE id=:id"), {'id': task_id})
+        if transcript is not None:
+            logger.info('transcript_reused %s', context)
+        else:
+            transcript = await mock_transcribe(engine, task_id, row['recording_id'], context)
+            if transcript is None:
+                return
         logger.info("task_summarizing %s", context)
         result = await deepseek.summarize(transcript, context)
         # 结果和 done 状态同时提交，查询不会看到 done 但缺少结果。
@@ -79,6 +72,27 @@ async def transcribe(engine, task_id, deepseek):
                 ), {'id': task_id, 'code': code, 'message': message})
         except Exception as persistence_error:
             logger.error("task_failure_not_saved task_id=%s error=%s", task_id, type(persistence_error).__name__)
+
+
+async def mock_transcribe(engine, task_id, recording_id, context):
+    delay = random.uniform(5, 15)
+    logger.info("task_transcribing %s delay_seconds=%.2f", context, delay)
+    await asyncio.sleep(delay)
+    if random.random() < 0.2:
+        async with engine.begin() as conn:
+            await conn.execute(text(
+                "UPDATE tasks SET status='failed', error_code='ASR_FAILED', "
+                "error_message='模拟转写失败', finished_at=UTC_TIMESTAMP(6) WHERE id=:id"
+            ), {'id': task_id})
+        logger.info("task_failed %s code=ASR_FAILED", context)
+        return
+    transcript = '今天讨论了录音服务的开发计划。先完成上传和转写，再接入智能摘要。小王负责接口联调，小李在周五前整理部署文档。'
+    async with engine.begin() as conn:
+        await conn.execute(text(
+            "UPDATE recordings SET transcript=:transcript WHERE id=:id"
+        ), {'id': recording_id, 'transcript': transcript})
+        await conn.execute(text("UPDATE tasks SET status='summarizing' WHERE id=:id"), {'id': task_id})
+    return transcript
 
 
 def schedule(app, task_id):

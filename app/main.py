@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     app.state.deepseek = DeepSeek()
     try:
         await mark_interrupted(app.state.db)
-        logger.info("Application started (step 4: DeepSeek summaries)")
+        logger.info("Application started (step 5: retry and deletion)")
         yield
     finally:
         tasks = list(app.state.tasks)
@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
         logger.info("Database connections closed")
 
 
-app = FastAPI(title="Speech-to-Text API", version="0.4.0", lifespan=lifespan)
+app = FastAPI(title="Speech-to-Text API", version="0.5.0", lifespan=lifespan)
 app.include_router(router)
 
 

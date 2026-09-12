@@ -2,15 +2,28 @@ import json
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, File, Query, Request, UploadFile
+from fastapi import APIRouter, File, Query, Request, UploadFile, Response
 from sqlalchemy import text
 
 from app.config import UPLOAD_DIR
 from app.errors import APIError
-from app.recordings import create_recording
+from app.recordings import create_recording, retry_task, delete_recording
 from app.tasks import schedule
 
 router = APIRouter(prefix='/v1')
+
+
+@router.post('/tasks/{task_id}/retry', status_code=202)
+async def retry(task_id: UUID, request: Request):
+    result = await retry_task(request.app.state.db, str(task_id))
+    schedule(request.app, result['task_id'])
+    return result
+
+
+@router.delete('/recordings/{recording_id}', status_code=204)
+async def delete(recording_id: UUID, request: Request):
+    await delete_recording(request.app.state.db, str(recording_id), UPLOAD_DIR)
+    return Response(status_code=204)
 
 
 def serialize(row):
