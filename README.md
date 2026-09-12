@@ -2,7 +2,9 @@
 
 Python 3.12 + FastAPI + MySQL，按阶段开发的录音转写与摘要服务。
 
-当前完成第 5 步：上传、异步 Mock 转写、真实摘要、查询、失败手动重试和终态录音删除，六个业务接口均已实现。完整范围见[项目实现方案](项目实现方案.md)。只选择 Azure 公网部署加分项，不实现其他加分项。
+当前完成第 6 步：六个业务接口、本地一键启动和人工验收材料已齐全。Azure 公网部署留到第 7 步；只选择这一项加分功能，不实现其他加分项。
+
+交付入口：[Postman 调试文件](docs/api.postman_collection.json) · [本地验收指南](docs/local-acceptance.md) · [开发及提交记录](docs/development-log.md) · [完整实现方案](项目实现方案.md)。
 
 ## 启动
 
@@ -10,7 +12,7 @@ Python 3.12 + FastAPI + MySQL，按阶段开发的录音转写与摘要服务。
 
 1. 首次运行将 `.env.example` 复制为 `.env`；如果已有 `.env`，只补齐缺少的配置，不要覆盖密钥。
 2. 为 `MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD` 设置不同的随机密码。
-3. 在项目根目录执行 `docker compose up -d --build`。
+3. 在项目根目录执行 `docker compose up -d --build --wait --wait-timeout 120`。
 4. 访问 http://localhost:8000/health 和 http://localhost:8000/docs 。
 
 本机的 `.env` 已在开发过程中补齐随机数据库密码。数据库不映射到宿主机端口，不需要安装或配置现有 MySQL。应用只绑定本机回环地址，Azure 公网绑定留到第 7 步。
@@ -37,12 +39,26 @@ Python 3.12 + FastAPI + MySQL，按阶段开发的录音转写与摘要服务。
 
 ```mermaid
 flowchart LR
-    Client[本机客户端] --> API[FastAPI /health]
-    API --> DB[(MySQL 8.4)]
-    SQL[001_init.sql] --> DB
+    Client[客户端 / Postman] -->|上传、查询、重试、删除| API[FastAPI]
+    API -->|保存 UUID 文件| Disk[(uploads 持久卷)]
+    API -->|事务创建录音与 pending 任务| DB[(MySQL 持久卷)]
+    API -->|注册后台协程，立即返回 202| Worker[asyncio 任务]
+    Worker --> Mock[Mock 转写 5～15 秒]
+    Mock --> LLM[真实 DeepSeek JSON 摘要]
+    Mock -->|转写结果 / 失败| DB
+    LLM -->|摘要与 done / failed| DB
 ```
 
 `recordings` 保存录音元数据、转写文本和 JSON 摘要；`tasks` 保存状态、轮次、错误和执行时间。UUID 由业务层生成；每条录音对应一个任务，外键级联删除，所有业务时间约定 UTC。初始化 SQL 仅建表，不写入演示数据。
+
+| 表 | 字段与用途 |
+| --- | --- |
+| recordings | id：UUID 主键；original_filename：展示名；storage_path：内部文件路径；size_bytes：实际大小；transcript：转写；summary_result：JSON 摘要；created_at/updated_at：创建与修改时间 |
+| tasks | id：UUID 主键；recording_id：唯一外键；status：五阶段状态；attempt：执行轮次；error_code/error_message：失败原因；created_at/updated_at/started_at/finished_at：生命周期时间 |
+
+索引：recordings(created_at,id) 支持列表排序，tasks(status,created_at) 支持状态筛选；recording_id 唯一约束保证一条录音一个任务。精确定义以 [建表 SQL](sql/001_init.sql) 为准。
+
+选型取舍：使用 SQLAlchemy 异步连接和参数化 SQL，两个简单实体不额外引入 ORM 模型层；使用进程内 asyncio，避免 Redis/Celery。代价是只支持单实例，重启不会恢复业务任务。使用本地卷代替对象存储，跨文件与数据库的一致性通过单文件补偿处理，无法保证跨介质原子提交。
 
 `sql/001_init.sql` 由 MySQL 官方镜像在空数据卷首次启动时执行。已有数据卷不会重新执行初始化 SQL；后续表结构变更提供新的编号迁移，不通过删除数据卷重建。
 
@@ -54,7 +70,7 @@ flowchart LR
 
 第 1 步人工验收：Compose 两个服务健康；`/health` 200；`/docs` 可访问；两张表及外键存在；暂停数据库时 `/health` 503，恢复后回到 200。验收与提交记录见 [开发记录](docs/development-log.md)。
 
-Azure 部署与完整 API 调试文件按后续阶段补充。真实摘要调用会消耗 DeepSeek 额度，不进行自动重试。
+Postman 文件和详细人工步骤已提供。真实摘要调用会消耗 DeepSeek 额度，不进行自动重试。
 
 ## 第 2 步：文件与持久化服务
 
@@ -117,3 +133,13 @@ Pydantic 严格要求 summary 为非空字符串，key_points 和 todos 为非�
 删除与重试统一先锁任务行。确认终态后只删除 uploads 目录中一个明确路径文件，再删除录音记录，由外键删除关联任务。文件不存在视为已清理；权限或路径错误返回 500 FILE_DELETE_FAILED，数据库保留。若文件删除成功而数据库提交失败，文件无法回滚，再次 DELETE 可完成数据库清理。禁止批量或递归删除文件。
 
 日志包括 task_retried、retry_rejected、transcript_reused、delete_rejected、delete_file_failed、recording_deleted，可结合任务 ID 和 attempt 追踪处理过程。详细人工验收与提交记录见开发记录。本轮验收只使用独立进程的本地摘要替身，运行中服务仍调用真实 DeepSeek。
+
+## 已知限制与未完成项
+
+- 第 7 步 Azure 公网部署尚未完成，没有公网演示地址。
+- 转写是 Mock，不解析音频；samples/demo.wav 是 0.1 秒静音样例，供上传演示。
+- 无鉴权、无前端，当前只绑定本机回环地址；尚未实现公网部署配置。
+- 无自动重试、自动恢复、SSE、上传幂等、并发上限或自动化测试套件，这是已确定的范围。
+- 文件系统和数据库不是一个事务；突然退出可能遗留文件，文件删除后数据库提交失败需再次删除或人工核查。
+- 依赖直接版本已固定，但镜像标签与间接依赖仍可能更新；本地验收证明当前构建可运行，不保证永远可重复得到同一镜像摘要。
+- 后续仅按第 7 步接入 Azure 并补充公网验证，不在本轮扩展功能。

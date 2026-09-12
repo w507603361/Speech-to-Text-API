@@ -1,5 +1,34 @@
 # 开发记录
 
+## 第 6 步：本地交付与完整人工验收
+
+- 日期：2026-09-12。未修改业务行为，应用接口版本保持 0.5.0。
+- 新增 Postman Collection（健康检查和六个业务接口）、0.1 秒静音 WAV 样例、本地启动与人工验收指南。
+- README 补齐完整架构图、表字段和索引、技术取舍、数据维护和已知限制；Compose 增加数据卷用途注释。保留原有生命周期与业务日志，使用 `docker compose logs --timestamps` 查看时间。
+- 一键命令补充 --wait --wait-timeout 120，确保命令成功结束时两个服务健康。
+
+| 本轮实际验收 | 结果 |
+| --- | --- |
+| 隔离项目 speech-step6，从全新 MySQL/上传卷启动 | 一条 up --build --wait 命令成功，两个服务 healthy |
+| 隔离环境 /docs | HTTP 200，端口 18001 |
+| 一次性独立 ASGI 进程 + 真实 MySQL + 本地摘要替身 | 上传 → Mock 失败 → 手动重试 → done → 任务、详情、分页查询通过 |
+| 实际重启隔离 API | pending、transcribing、summarizing 三个样例均 failed / SERVICE_RESTARTED，不自动续跑 |
+| 完成态持久化 | done 状态、摘要和文件跨重启保留 |
+| 实际 HTTP 删除唯一指定完成态样例 | 204 空响应，单个文件清理成功 |
+| Postman JSON 与脚本 | 七个请求解析成功；独立执行变量保存脚本可正确捕获两个 ID |
+| samples/demo.wav | 单声道、8000Hz、800 帧，合法 0.1 秒静音 WAV |
+| 原有 18000 服务 | /health 返回 200、database=ok，未停止 |
+
+未在 Postman 桌面界面中实际执行导入；通过 JSON 结构、请求内容与 ID 脚本检查，提供用户导入步骤。不增加测试套件、自动轮询或自动重试。真实 DeepSeek 调用为 0 次；第四步的一次真实成功记录仍保留。
+
+隔离环境使用 .env.step6（Git 忽略、空 API Key、随机数据库密码），本轮结束时已停止两个容器，保留 speech-step6_mysql_data 与 speech-step6_uploads 两个卷及三个小型中断样例，不批量删除。原有业务卷没有修改。恢复隔离环境可使用 `docker compose -p speech-step6 --env-file .env.step6 up -d --wait`。
+
+本次通过 HTTP 删除的唯一验收录音为 bd9ed8fe-a53f-48a3-865d-44326427ef9e。其他验收是一次性命令，没有写入仓库测试文件。
+
+尚未完成第 7 步 Azure 公网部署，需要届时提供 Azure 订阅、资源/VM、地区预算及 SSH 信息；本轮未创建或操作 Azure 资源。
+
+代码/交付提交主题：`docs: add local setup and API acceptance guide`，提交后补记远程核对结果。
+
 ## 第 5 步：失败重试、删除与并发保护
 
 - 日期：2026-09-12，版本 0.5.0。

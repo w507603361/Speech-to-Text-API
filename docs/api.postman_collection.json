@@ -1,0 +1,54 @@
+{
+  "info": {
+    "name": "Speech-to-Text API",
+    "description": "手动调试六个业务接口。上传前选择本机音频；默认本机端口 18000。每次上传或重试可能产生 DeepSeek 费用。请逐条发送，不运行整个集合；删除仅针对当前 recording_id。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:18000"},
+    {"key": "recording_id", "value": ""},
+    {"key": "task_id", "value": ""}
+  ],
+  "item": [
+    {
+      "name": "01 健康检查",
+      "request": {"method": "GET", "url": "{{base_url}}/health"}
+    },
+    {
+      "name": "02 上传录音（手动选择文件）",
+      "request": {
+        "method": "POST", "url": "{{base_url}}/v1/recordings",
+        "description": "Body → form-data → file：选择 samples/demo.wav 或自己的音频。不要手动填写 Content-Type，Postman 自动生成 boundary。成功返回 202 并保存两个 ID。",
+        "body": {"mode": "formdata", "formdata": [{"key": "file", "type": "file", "src": null}]}
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "// 仅保存手动调试变量，不自动轮询、重试或断言。",
+        "if (pm.response.code === 202) {",
+        "  const result = pm.response.json();",
+        "  pm.collectionVariables.set('recording_id', result.recording_id);",
+        "  pm.collectionVariables.set('task_id', result.task_id);",
+        "}"
+      ]}}]
+    },
+    {
+      "name": "03 查询当前任务（可重复手动发送）",
+      "request": {"method": "GET", "url": "{{base_url}}/v1/tasks/{{task_id}}", "description": "观察 pending/transcribing/summarizing/done/failed；失败原因在 error_code 和 error_message。"}
+    },
+    {
+      "name": "04 查询录音列表",
+      "request": {"method": "GET", "url": "{{base_url}}/v1/recordings?page=1&page_size=20"}
+    },
+    {
+      "name": "05 查询当前录音详情",
+      "request": {"method": "GET", "url": "{{base_url}}/v1/recordings/{{recording_id}}", "description": "done 时检查 transcript、summary_result.summary、key_points、todos。"}
+    },
+    {
+      "name": "06 手动重试（仅 failed）",
+      "request": {"method": "POST", "url": "{{base_url}}/v1/tasks/{{task_id}}/retry", "description": "failed 返回 202，复用原任务 ID、递增 attempt；其他状态 409。随后手动查询任务。可能消耗 API 额度。"}
+    },
+    {
+      "name": "07 删除当前录音（仅 done 或 failed）",
+      "request": {"method": "DELETE", "url": "{{base_url}}/v1/recordings/{{recording_id}}", "description": "先核对当前 recording_id，仅删除这一条录音、对应单个文件和关联任务。204 空响应，活动任务 409，重复删除 404。"}
+    }
+  ]
+}

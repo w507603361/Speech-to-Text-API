@@ -8,6 +8,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Configure MYSQL_PASSWORD in .env}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Configure MYSQL_ROOT_PASSWORD in .env}
     volumes:
+      # 命名卷持久化数据库，初始化 SQL 仅在空卷执行。
       - mysql_data:/var/lib/mysql
       - ./sql:/docker-entrypoint-initdb.d:ro
     healthcheck:
@@ -20,6 +21,7 @@ services:
   api:
     build: .
     volumes:
+      # 本地磁盘录音独立持久化，重建应用镜像不清空文件。
       - uploads:/app/uploads
     ports:
       - "127.0.0.1:${APP_PORT:-8000}:8000"
