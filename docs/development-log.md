@@ -21,7 +21,12 @@
 
 本轮没有真实 DeepSeek 请求（0 次），没有新增自动化测试套件；替身不影响运行中的真实服务。文件系统和数据库不能原子提交的限制已写入 README。第 6 步交付材料与第 7 步 Azure 部署仍待完成。
 
-代码提交主题：`feat: support safe retry and recording deletion`，提交后补记远程核对结果。
+代码提交主题：`feat: support safe retry and recording deletion`。
+
+- 代码提交：`6ff5585a1b7962f80528ed2a658778d811ba01df`。
+- 链接：https://github.com/w507603361/Speech-to-Text-API/commit/6ff5585a1b7962f80528ed2a658778d811ba01df 。
+- 已推送 origin/main 并通过 ls-remote 核对；本条记录以独立文档提交追加。
+- 最终 /health 返回 200，database=ok；本机继续使用 18000 端口。
 
 ## 第 4 步：真实 DeepSeek 摘要
 
