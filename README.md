@@ -2,9 +2,9 @@
 
 Python 3.12 + FastAPI + MySQL，按阶段开发的录音转写与摘要服务。
 
-当前完成第 6 步：六个业务接口、本地一键启动和人工验收材料已齐全。Azure 公网部署留到第 7 步；只选择这一项加分功能，不实现其他加分项。
+最终交付范围为前六步：六个业务接口、本地 Docker 一键启动和人工验收材料。用户已取消云端部署，项目以本地运行版本结项。
 
-交付入口：[Postman 调试文件](docs/api.postman_collection.json) · [本地验收指南](docs/local-acceptance.md) · [开发及提交记录](docs/development-log.md) · [完整实现方案](项目实现方案.md)。
+交付入口：[Postman 调试文件](docs/api.postman_collection.json) · [本地验收指南](docs/local-acceptance.md) · [本地运行文档](docs/run-local.md) · [开发及提交记录](docs/development-log.md) · [完整实现方案](项目实现方案.md)。
 
 ## 启动
 
@@ -15,7 +15,7 @@ Python 3.12 + FastAPI + MySQL，按阶段开发的录音转写与摘要服务。
 3. 在项目根目录执行 `docker compose up -d --build --wait --wait-timeout 120`。
 4. 访问 http://localhost:8000/health 和 http://localhost:8000/docs 。
 
-本机的 `.env` 已在开发过程中补齐随机数据库密码。数据库不映射到宿主机端口，不需要安装或配置现有 MySQL。应用只绑定本机回环地址，Azure 公网绑定留到第 7 步。
+本机的 `.env` 已在开发过程中补齐随机数据库密码。数据库不映射到宿主机端口，不需要安装或配置现有 MySQL。Compose 仅用于本地回环访问，应用和 MySQL 均在本机容器中运行。
 
 **当前开发电脑的 8000 端口已有其他服务，本机 `.env` 已设为 `APP_PORT=18000`，请访问 http://localhost:18000/health 和 http://localhost:18000/docs 。新环境示例仍默认使用 8000，可自行调整 APP_PORT。**
 
@@ -134,12 +134,10 @@ Pydantic 严格要求 summary 为非空字符串，key_points 和 todos 为非�
 
 日志包括 task_retried、retry_rejected、transcript_reused、delete_rejected、delete_file_failed、recording_deleted，可结合任务 ID 和 attempt 追踪处理过程。详细人工验收与提交记录见开发记录。本轮验收只使用独立进程的本地摘要替身，运行中服务仍调用真实 DeepSeek。
 
-## 已知限制与未完成项
+## 已知限制
 
-- 第 7 步 Azure 公网部署尚未完成，没有公网演示地址。
 - 转写是 Mock，不解析音频；samples/demo.wav 是 0.1 秒静音样例，供上传演示。
-- 无鉴权、无前端，当前只绑定本机回环地址；尚未实现公网部署配置。
+- 无鉴权、无前端，当前只绑定本机回环地址。
 - 无自动重试、自动恢复、SSE、上传幂等、并发上限或自动化测试套件，这是已确定的范围。
 - 文件系统和数据库不是一个事务；突然退出可能遗留文件，文件删除后数据库提交失败需再次删除或人工核查。
 - 依赖直接版本已固定，但镜像标签与间接依赖仍可能更新；本地验收证明当前构建可运行，不保证永远可重复得到同一镜像摘要。
-- 后续仅按第 7 步接入 Azure 并补充公网验证，不在本轮扩展功能。

@@ -47,4 +47,4 @@ Compose 在 MySQL 健康后启动应用。数据库空卷第一次自动运行 s
 | 摘要失败 | 根据 LLM_* 错误码核对 Key、额度、网络和模型；修复后手动 retry |
 | 查看实际数据位置 | docker volume inspect speech-to-text-api_mysql_data 或 speech-to-text-api_uploads；自定义项目名时卷名使用对应前缀 |
 
-停止容器不删除数据；本文不提供递归清空命令。需要批量清理文件或云资源时由用户自行处理。Azure 公网地址和云端部署文档在第 7 步补充。
+停止容器不删除数据；本文不提供递归清空命令。需要批量清理文件时由用户自行处理。完整运行命令见 [本地运行文档](run-local.md)。

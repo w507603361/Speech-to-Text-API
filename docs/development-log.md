@@ -1,5 +1,17 @@
 # 开发记录
 
+## 最终结项：本地 Docker 交付
+
+- 用户取消第七步云端部署，项目最终范围为前六步功能及本地运行；保留原有分阶段提交历史，不强制改写历史。
+- 删除未提交的云部署工作流、专用启动脚本和部署指南；恢复 app/database.py、.env.example、compose.yaml、.gitattributes 到第六步版本。仅逐个删除明确路径文件，保留空目录。
+- 核对 origin/main 仍为 ba02153，云部署代码未曾推送；本次通过正常提交同步最终文档和范围。
+- 新增 docs/run-local.md，覆盖首次配置、一键启动、Swagger/Postman 演示、停止、重启、更新、数据持久化和故障排查；清除现行实现方案和运行文档中的云部署步骤。
+- app/、Dockerfile、compose.yaml、requirements.txt、sql/、.env.example 与第六步交付版本没有差异，原有六个业务接口保留。
+- 实际执行 docker compose up -d --build --wait --wait-timeout 120 成功；api、db 均 healthy；API 仅绑定 127.0.0.1:18000，数据库不暴露宿主机端口。
+- /health 返回 HTTP 200、status=ok、database=ok；/docs 返回 200；OpenAPI 含六个业务操作；录音列表查询成功，原有两条记录保留。
+- 本轮真实 DeepSeek 调用 0 次；没有上传、重试或删除业务记录，没有清理数据卷或改动真实 .env。
+- 本轮未操作 Azure 资源。取消部署及删除本地配置不代表停止或删除云资源，已有资源由用户管理。
+
 ## 第 6 步：本地交付与完整人工验收
 
 - 日期：2026-09-12。未修改业务行为，应用接口版本保持 0.5.0。
@@ -25,7 +37,7 @@
 
 本次通过 HTTP 删除的唯一验收录音为 bd9ed8fe-a53f-48a3-865d-44326427ef9e。其他验收是一次性命令，没有写入仓库测试文件。
 
-尚未完成第 7 步 Azure 公网部署，需要届时提供 Azure 订阅、资源/VM、地区预算及 SSH 信息；本轮未创建或操作 Azure 资源。
+本阶段完成本地交付；最终范围以本文顶部的结项记录为准。
 
 交付提交主题：`docs: add local setup and API acceptance guide`。
 
@@ -53,7 +65,7 @@
 
 第一条验收录音 ac1090c7-90d6-469d-a3c8-273f31caf071 对应文件 69952136-e021-464b-81d8-653a5fde1f50.wav，通过 DELETE 接口单独删除。第二条验收录音 a1ad83b7-8295-4346-8746-2ff0d0c3d85b 也仅删除自己的单个文件及关联数据。没有批量删除，保留前三、四步的原有演示记录。
 
-本轮没有真实 DeepSeek 请求（0 次），没有新增自动化测试套件；替身不影响运行中的真实服务。文件系统和数据库不能原子提交的限制已写入 README。第 6 步交付材料与第 7 步 Azure 部署仍待完成。
+本轮没有真实 DeepSeek 请求（0 次），没有新增自动化测试套件；替身不影响运行中的真实服务。文件系统和数据库不能原子提交的限制已写入 README。当时第 6 步交付材料仍待完成。
 
 代码提交主题：`feat: support safe retry and recording deletion`。
 
@@ -84,7 +96,7 @@
 
 旧 stage3 样例用于零费用错误验收，最终状态为 failed / LLM_TIMEOUT。本轮替身只运行在独立验收进程，没有替换正在运行的真实客户端，也未添加自动化测试套件。
 
-密钥仅从 .env 注入应用容器，不进入镜像或 Git。第 5 步的重试与删除、第 7 步 Azure 部署尚未实现。
+密钥仅从 .env 注入应用容器，不进入镜像或 Git。当时第 5 步的重试与删除尚未实现。
 
 代码提交主题：`feat: generate validated summaries with DeepSeek`。
 
@@ -156,7 +168,7 @@
 - 完成内容：FastAPI 入口、环境变量配置、SQLAlchemy 异步 MySQL 连接、数据库健康检查、初始化 SQL、Dockerfile、Compose、README 和忽略规则。
 - 配置：保留原有 .env，补齐独立应用账号和随机数据库密码；MySQL 数据使用命名卷，不开放 3306 宿主机端口。
 - 密钥：.env 不提交、不复制进 Docker 镜像；本阶段不调用 DeepSeek。
-- 实施边界：不实现录音上传、转写、摘要或 Azure 部署，不编写自动化测试套件。
+- 实施边界：不实现录音上传、转写或摘要，不编写自动化测试套件。
 - 环境处理：Docker 镜像源首次返回 502，单独重试拉取官方 Python 镜像后成功；未修改全局镜像源。本机 8000 已占用，项目 .env 改用 18000，没有停止其他服务。
 - 依赖：从 PyPI 核对并固定 FastAPI 0.141.1、Uvicorn 0.52.4、SQLAlchemy 2.0.52、asyncmy 0.2.14 和 cryptography 50.0.1。
 
